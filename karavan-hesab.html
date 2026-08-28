@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KARAVAN — Masa Hesabı</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#1c1410; --panel:#2a1f18; --panel2:#332619; --accent:#b03a2e; --accent2:#8b2f24;
+    --gold:#c9a24b; --text:#f3e9dc; --muted:#b8a996; --green:#3f7d4f; --line:#4a3a2c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:linear-gradient(180deg,#1c1410,#100b08); color:var(--text); min-height:100vh;
+  }
+  header{
+    padding:18px 16px 10px; text-align:center; border-bottom:2px solid var(--line);
+    background:var(--panel); display:flex; flex-direction:column; align-items:center; position:relative;
+  }
+  header h1{ margin:0; font-size:28px; letter-spacing:3px; color:var(--accent); font-weight:800; }
+  header p{margin:4px 0 0; color:var(--gold); font-size:12px; letter-spacing:2px;}
+  .user-bar{
+    display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--muted);
+  }
+  .user-bar img{width:22px; height:22px; border-radius:50%;}
+  .logout-btn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--muted); padding:4px 10px;
+    border-radius:12px; font-size:11px; cursor:pointer;
+  }
+
+  .view{display:none; padding:14px;}
+  .view.active{display:block;}
+
+  #tablesGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:10px; margin-top:12px; }
+  .table-btn{
+    background:var(--panel2); border:2px solid var(--line); border-radius:12px; padding:14px 6px;
+    text-align:center; color:var(--text); cursor:pointer; font-weight:700; font-size:15px;
+    transition:.15s; position:relative;
+  }
+  .table-btn:active{transform:scale(0.96);}
+  .table-btn.occupied{border-color:var(--accent); background:linear-gradient(145deg,#3a1d17,#2a1310);}
+  .table-btn .sum{display:block; font-size:11px; color:var(--gold); font-weight:600; margin-top:4px;}
+  .table-btn .dot{ position:absolute; top:6px; right:8px; width:8px; height:8px; border-radius:50%; background:var(--green); }
+  .table-btn.occupied .dot{background:var(--accent);}
+
+  .topbar{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+  .back-btn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--gold); padding:8px 14px;
+    border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;
+  }
+  .topbar h2{margin:0; font-size:20px; color:var(--gold);}
+
+  .cat-tabs{display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px;}
+  .cat-tab{
+    flex:0 0 auto; background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+    padding:7px 12px; border-radius:20px; font-size:13px; cursor:pointer; white-space:nowrap;
+  }
+  .cat-tab.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+
+  .menu-list{display:flex; flex-direction:column; gap:8px; margin-bottom:16px;}
+  .menu-item{
+    display:flex; justify-content:space-between; align-items:center; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  }
+  .menu-item .name{font-size:14.5px; font-weight:600;}
+  .menu-item .price{font-size:12.5px; color:var(--gold); margin-top:2px;}
+  .add-btn{
+    background:var(--accent); border:none; color:#fff; width:34px; height:34px; border-radius:8px;
+    font-size:20px; cursor:pointer; line-height:1;
+  }
+  .add-btn:active{background:var(--accent2);}
+
+  .order-box{
+    background:var(--panel2); border:1px solid var(--gold); border-radius:12px; padding:12px; margin-bottom:70px;
+  }
+  .order-box h3{margin:0 0 10px; color:var(--gold); font-size:16px;}
+  .order-row{
+    display:flex; align-items:center; justify-content:space-between; padding:7px 0;
+    border-bottom:1px solid var(--line); font-size:14px;
+  }
+  .order-row:last-child{border-bottom:none;}
+  .order-row .oname{flex:1;}
+  .qty-ctl{display:flex; align-items:center; gap:8px;}
+  .qty-ctl button{
+    background:var(--panel); border:1px solid var(--line); color:var(--text); width:26px; height:26px;
+    border-radius:6px; font-size:16px; cursor:pointer;
+  }
+  .oline-total{width:60px; text-align:right; color:var(--gold); font-weight:600; font-size:13px;}
+  .empty-msg{color:var(--muted); text-align:center; padding:14px; font-size:13.5px;}
+
+  .totalbar{
+    position:fixed; bottom:0; left:0; right:0; background:var(--panel); border-top:2px solid var(--accent);
+    padding:12px 16px; display:flex; justify-content:space-between; align-items:center; z-index:10;
+  }
+  .totalbar .sum{font-size:20px; font-weight:800; color:var(--gold);}
+  .close-btn{
+    background:var(--green); border:none; color:#fff; padding:10px 16px; border-radius:8px;
+    font-weight:700; cursor:pointer; font-size:13.5px;
+  }
+  .loading{text-align:center; color:var(--muted); padding:30px; font-size:14px;}
+
+  .nav{display:flex; border-bottom:2px solid var(--line); background:var(--panel);}
+  .nav-btn{
+    flex:1; text-align:center; padding:11px 4px; color:var(--muted); font-size:13px; font-weight:700;
+    cursor:pointer; border-bottom:3px solid transparent;
+  }
+  .nav-btn.active{color:var(--gold); border-bottom-color:var(--accent);}
+
+  .stat-cards{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;}
+  .stat-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; text-align:center;
+  }
+  .stat-card .label{color:var(--muted); font-size:12px; margin-bottom:6px;}
+  .stat-card .val{color:var(--gold); font-size:20px; font-weight:800;}
+  .stat-card .cnt{color:var(--muted); font-size:11px; margin-top:3px;}
+
+  .hist-item{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;
+  }
+  .hist-top{display:flex; justify-content:space-between; align-items:center; cursor:pointer;}
+  .hist-top .hleft{font-size:13.5px; font-weight:700;}
+  .hist-top .hdate{color:var(--muted); font-size:11.5px; margin-top:2px; font-weight:400;}
+  .hist-top .htotal{color:var(--gold); font-weight:800; font-size:15px;}
+  .hist-detail{display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--line);}
+  .hist-detail.open{display:block;}
+  .hist-detail .drow{display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:2px 0;}
+
+  /* LOGIN OVERLAY */
+  #loginOverlay{
+    position:fixed; inset:0; background:#100b08; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; z-index:100; padding:20px; text-align:center;
+  }
+  #loginOverlay h1{color:var(--accent); font-size:32px; letter-spacing:3px; margin-bottom:6px;}
+  #loginOverlay p{color:var(--muted); margin-bottom:26px; font-size:13.5px;}
+  .google-btn{
+    background:#fff; color:#333; border:none; padding:12px 22px; border-radius:10px; font-size:15px;
+    font-weight:700; cursor:pointer; display:flex; align-items:center; gap:10px;
+  }
+  .google-btn img{width:20px; height:20px;}
+  #syncMsg{color:var(--muted); font-size:11.5px; text-align:center; padding:8px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay">
+  <h1>KARAVAN</h1>
+  <p>Masa Hesabı — davam etmək üçün Google hesabı ilə daxil olun</p>
+  <button class="google-btn" onclick="signIn()">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
+    Google ilə daxil ol
+  </button>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+<header>
+  <h1>KARAVAN</h1>
+  <p>GELENEKSEL LEZZETLER — Masa Hesabı</p>
+  <div class="user-bar">
+    <img id="userPhoto" src="" alt="">
+    <span id="userName"></span>
+    <button class="logout-btn" onclick="signOutUser()">Çıxış</button>
+  </div>
+</header>
+
+<div class="nav">
+  <div class="nav-btn active" id="nav-tables" onclick="switchMain('tables')">Masalar</div>
+  <div class="nav-btn" id="nav-history" onclick="switchMain('history')">Tarixçə</div>
+  <div class="nav-btn" id="nav-stats" onclick="switchMain('stats')">Qazanc</div>
+</div>
+
+<div class="view active" id="viewTables">
+  <div id="tablesGrid" class="loading">Yüklənir...</div>
+</div>
+
+<div class="view" id="viewHistory">
+  <div id="historyList" class="loading">Yüklənir...</div>
+</div>
+
+<div class="view" id="viewStats">
+  <div class="stat-cards">
+    <div class="stat-card"><div class="label">Bu gün</div><div class="val" id="stat-day">0</div><div class="cnt" id="cnt-day"></div></div>
+    <div class="stat-card"><div class="label">Bu həftə</div><div class="val" id="stat-week">0</div><div class="cnt" id="cnt-week"></div></div>
+    <div class="stat-card"><div class="label">Bu ay</div><div class="val" id="stat-month">0</div><div class="cnt" id="cnt-month"></div></div>
+    <div class="stat-card"><div class="label">Bu il</div><div class="val" id="stat-year">0</div><div class="cnt" id="cnt-year"></div></div>
+  </div>
+</div>
+
+<div class="view" id="viewTable">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">← Geri</button>
+    <h2 id="tableTitle">Masa</h2>
+  </div>
+  <div class="cat-tabs" id="catTabs"></div>
+  <div class="menu-list" id="menuList"></div>
+  <div class="order-box">
+    <h3>Sifariş</h3>
+    <div id="orderRows"><div class="empty-msg">Hələ sifariş yoxdur</div></div>
+  </div>
+</div>
+
+<div class="totalbar" id="totalbar" style="display:none;">
+  <div>Cəm: <span class="sum" id="totalSum">0</span> GEL</div>
+  <button class="close-btn" onclick="closeTable()">Hesabı bağla</button>
+</div>
+
+</div>
+
+<script>
+/* ===== FIREBASE ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCPsBHTQ0IjPUsRsoszs5Hj_Nmtlm_rj7k",
+  authDomain: "karavan-hesab.firebaseapp.com",
+  projectId: "karavan-hesab",
+  storageBucket: "karavan-hesab.firebasestorage.app",
+  messagingSenderId: "1012694504405",
+  appId: "1:1012694504405:web:4e68d31a950cba845ea35c",
+  measurementId: "G-J7DDH69NH4"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser = null;
+
+function signIn(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err=>{
+    alert('Giriş xətası: ' + err.message);
+  });
+}
+function signOutUser(){ auth.signOut(); }
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    currentUser = user;
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'block';
+    document.getElementById('userPhoto').src = user.photoURL || '';
+    document.getElementById('userName').textContent = user.displayName || user.email || '';
+    loadAllTables();
+  } else {
+    currentUser = null;
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+  }
+});
+
+function userDoc(path){
+  return db.collection('users').doc(currentUser.uid).collection(path);
+}
+
+/* ===== MENU ===== */
+const TABLE_COUNT = 16;
+const MENU = {
+  "Salatlar": [
+    {n:"Sezar", p:13}, {n:"Fries", p:5}, {n:"Manqal Salatı", p:5},
+    {n:"Çoban Salatı", p:5}, {n:"Tursu", p:5}, {n:"Pendir", p:5},
+    {n:"Göy-göyərti", p:5}, {n:"Sos", p:3}
+  ],
+  "Qrill": [
+    {n:"Tikə", p:15}, {n:"Basdırma", p:15}, {n:"Lülə", p:15},
+    {n:"Xan Kənabı", p:15}, {n:"Qanad", p:10}, {n:"Rulet", p:15}
+  ],
+  "Əsas yeməklər": [
+    {n:"Pizza", p:20}, {n:"İmeruli", p:20}, {n:"Laahmacun", p:8},
+    {n:"Xəngəl", p:1.70}, {n:"Dusbere", p:10}, {n:"Ostra", p:10},
+    {n:"Saç (Mal-Yarı)", p:35}, {n:"Saç (Mal-Tam)", p:60},
+    {n:"Saç (Quzu-Yarı)", p:40}, {n:"Saç (Quzu-Tam)", p:70},
+    {n:"Xaşlama", p:13}, {n:"Dapa (Quzu)", p:60}, {n:"Dapa (Mal)", p:50},
+    {n:"Qalmax", p:10}, {n:"Qutab (Ətli)", p:8}, {n:"Qutab (Sadə)", p:5},
+    {n:"Yarpaq Xəngəli (Ətli)", p:15}, {n:"Yarpaq Xəngəli (Sadə)", p:10}
+  ]
+};
+
+let currentTable = null;
+let currentOrder = {};
+let currentCat = Object.keys(MENU)[0];
+
+async function loadAllTables(){
+  const grid = document.getElementById('tablesGrid');
+  grid.innerHTML = '';
+  grid.classList.remove('loading');
+  for(let i=1;i<=TABLE_COUNT;i++){
+    const btn = document.createElement('div');
+    btn.className = 'table-btn';
+    btn.id = 'tbl-'+i;
+    btn.innerHTML = `<span class="dot"></span>Masa ${i}<span class="sum" id="tbl-sum-${i}"></span>`;
+    btn.onclick = () => openTable(i);
+    grid.appendChild(btn);
+    refreshTableSummary(i);
+  }
+}
+
+async function refreshTableSummary(i){
+  const order = await getTableOrder(i);
+  const total = calcTotal(order);
+  const el = document.getElementById('tbl-sum-'+i);
+  const box = document.getElementById('tbl-'+i);
+  if(!el || !box) return;
+  if(total > 0){
+    el.textContent = total.toFixed(2)+' GEL';
+    box.classList.add('occupied');
+  } else {
+    el.textContent = '';
+    box.classList.remove('occupied');
+  }
+}
+
+async function getTableOrder(i){
+  try{
+    const doc = await userDoc('masalar').doc(String(i)).get();
+    return doc.exists ? (doc.data().items || {}) : {};
+  }catch(e){
+    console.error(e);
+    return {};
+  }
+}
+
+function calcTotal(order){
+  let t = 0;
+  for(const k in order){ t += order[k].qty * order[k].price; }
+  return t;
+}
+
+async function openTable(i){
+  currentTable = i;
+  document.getElementById('tableTitle').textContent = 'Masa '+i;
+  ['viewTables','viewHistory','viewStats'].forEach(v=>document.getElementById(v).classList.remove('active'));
+  document.getElementById('viewTable').classList.add('active');
+  document.getElementById('totalbar').style.display = 'flex';
+
+  currentOrder = await getTableOrder(i);
+  renderCatTabs();
+  renderMenu();
+  renderOrder();
+}
+
+function goBack(){
+  document.getElementById('viewTable').classList.remove('active');
+  document.getElementById('viewTables').classList.add('active');
+  document.getElementById('totalbar').style.display = 'none';
+  currentTable = null;
+  loadAllTables();
+}
+
+function renderCatTabs(){
+  const wrap = document.getElementById('catTabs');
+  wrap.innerHTML = '';
+  Object.keys(MENU).forEach(cat=>{
+    const t = document.createElement('div');
+    t.className = 'cat-tab' + (cat===currentCat ? ' active' : '');
+    t.textContent = cat;
+    t.onclick = () => { currentCat = cat; renderCatTabs(); renderMenu(); };
+    wrap.appendChild(t);
+  });
+}
+
+function renderMenu(){
+  const wrap = document.getElementById('menuList');
+  wrap.innerHTML = '';
+  MENU[currentCat].forEach(item=>{
+    const row = document.createElement('div');
+    row.className = 'menu-item';
+    row.innerHTML = `
+      <div>
+        <div class="name">${item.n}</div>
+        <div class="price">${item.p} GEL</div>
+      </div>
+      <button class="add-btn">+</button>`;
+    row.querySelector('.add-btn').onclick = () => addItem(item.n, item.p);
+    wrap.appendChild(row);
+  });
+}
+
+function addItem(name, price){
+  if(!currentOrder[name]) currentOrder[name] = {qty:0, price:price};
+  currentOrder[name].qty += 1;
+  saveOrder();
+  renderOrder();
+}
+
+function changeQty(name, delta){
+  if(!currentOrder[name]) return;
+  currentOrder[name].qty += delta;
+  if(currentOrder[name].qty <= 0) delete currentOrder[name];
+  saveOrder();
+  renderOrder();
+}
+
+function renderOrder(){
+  const wrap = document.getElementById('orderRows');
+  const keys = Object.keys(currentOrder);
+  if(keys.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">Hələ sifariş yoxdur</div>';
+  } else {
+    wrap.innerHTML = '';
+    keys.forEach(name=>{
+      const it = currentOrder[name];
+      const row = document.createElement('div');
+      row.className = 'order-row';
+      row.innerHTML = `
+        <div class="oname">${name}</div>
+        <div class="qty-ctl">
+          <button onclick="changeQty('${escapeStr(name)}', -1)">−</button>
+          <span>${it.qty}</span>
+          <button onclick="changeQty('${escapeStr(name)}', 1)">+</button>
+        </div>
+        <div class="oline-total">${(it.qty*it.price).toFixed(2)}</div>`;
+      wrap.appendChild(row);
+    });
+  }
+  document.getElementById('totalSum').textContent = calcTotal(currentOrder).toFixed(2);
+}
+
+function escapeStr(s){ return s.replace(/'/g,"\\'"); }
+
+async function saveOrder(){
+  if(currentTable === null || !currentUser) return;
+  try{
+    await userDoc('masalar').doc(String(currentTable)).set({items: currentOrder});
+  }catch(e){
+    console.error('Yadda saxlama xətası', e);
+  }
+}
+
+async function closeTable(){
+  if(currentTable === null) return;
+  const total = calcTotal(currentOrder);
+  if(total <= 0){ alert('Sifariş boşdur.'); return; }
+  if(!confirm(`Masa ${currentTable} hesabı bağlanılsın?\nCəmi: ${total.toFixed(2)} GEL`)) return;
+
+  await addToHistory(currentTable, currentOrder, total);
+  currentOrder = {};
+  await saveOrder();
+  goBack();
+}
+
+/* ===== HISTORY ===== */
+async function addToHistory(table, order, total){
+  try{
+    await userDoc('tarixce').add({
+      date: new Date().toISOString(),
+      table: table,
+      items: order,
+      total: total
+    });
+  }catch(e){ console.error(e); }
+}
+
+async function getHistory(){
+  try{
+    const snap = await userDoc('tarixce').orderBy('date','desc').limit(300).get();
+    return snap.docs.map(d=>d.data());
+  }catch(e){
+    console.error(e);
+    return [];
+  }
+}
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function renderHistory(){
+  const wrap = document.getElementById('historyList');
+  wrap.classList.add('loading'); wrap.textContent = 'Yüklənir...';
+  const hist = await getHistory();
+  wrap.classList.remove('loading');
+  if(hist.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">Hələ bağlanmış hesab yoxdur</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  hist.forEach((rec, idx)=>{
+    const box = document.createElement('div');
+    box.className = 'hist-item';
+    let itemsHtml = '';
+    for(const name in rec.items){
+      const it = rec.items[name];
+      itemsHtml += `<div class="drow"><span>${name} x${it.qty}</span><span>${(it.qty*it.price).toFixed(2)} GEL</span></div>`;
+    }
+    box.innerHTML = `
+      <div class="hist-top" onclick="toggleHist(${idx})">
+        <div>
+          <div class="hleft">Masa ${rec.table}</div>
+          <div class="hdate">${fmtDate(rec.date)}</div>
+        </div>
+        <div class="htotal">${rec.total.toFixed(2)} GEL</div>
+      </div>
+      <div class="hist-detail" id="hdet-${idx}">${itemsHtml}</div>`;
+    wrap.appendChild(box);
+  });
+}
+
+function toggleHist(idx){
+  document.getElementById('hdet-'+idx).classList.toggle('open');
+}
+
+/* ===== STATS ===== */
+async function renderStats(){
+  const hist = await getHistory();
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dow = (now.getDay()+6)%7;
+  const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfDay.getDate()-dow);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+  let day={sum:0,cnt:0}, week={sum:0,cnt:0}, month={sum:0,cnt:0}, year={sum:0,cnt:0};
+  hist.forEach(rec=>{
+    const d = new Date(rec.date);
+    if(d >= startOfDay){ day.sum+=rec.total; day.cnt++; }
+    if(d >= startOfWeek){ week.sum+=rec.total; week.cnt++; }
+    if(d >= startOfMonth){ month.sum+=rec.total; month.cnt++; }
+    if(d >= startOfYear){ year.sum+=rec.total; year.cnt++; }
+  });
+
+  document.getElementById('stat-day').textContent = day.sum.toFixed(2)+' GEL';
+  document.getElementById('cnt-day').textContent = day.cnt+' hesab';
+  document.getElementById('stat-week').textContent = week.sum.toFixed(2)+' GEL';
+  document.getElementById('cnt-week').textContent = week.cnt+' hesab';
+  document.getElementById('stat-month').textContent = month.sum.toFixed(2)+' GEL';
+  document.getElementById('cnt-month').textContent = month.cnt+' hesab';
+  document.getElementById('stat-year').textContent = year.sum.toFixed(2)+' GEL';
+  document.getElementById('cnt-year').textContent = year.cnt+' hesab';
+}
+
+/* ===== NAV ===== */
+function switchMain(which){
+  ['tables','history','stats'].forEach(v=>{
+    document.getElementById('view'+capitalize(v)).classList.remove('active');
+    document.getElementById('nav-'+v).classList.remove('active');
+  });
+  document.getElementById('view'+capitalize(which)).classList.add('active');
+  document.getElementById('nav-'+which).classList.add('active');
+  document.getElementById('totalbar').style.display = 'none';
+
+  if(which === 'tables') loadAllTables();
+  if(which === 'history') renderHistory();
+  if(which === 'stats') renderStats();
+}
+
+function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+</script>
+
+</body>
+</html>
